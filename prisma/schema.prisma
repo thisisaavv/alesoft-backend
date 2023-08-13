@@ -1,0 +1,747 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+generator kysely {
+    provider     = "prisma-kysely"
+    output       = "../src/database"
+    fileName     = "types.ts"
+    enumFileName = "enums.ts"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DB_POSTGRES_PRISMA_URL")
+}
+
+model Customer {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    first_name  String
+    middle_name String?
+    last_name   String
+    id_card     String?
+    rtn         String?
+    birthdate   DateTime? @db.Date()
+
+    emails      String[]
+    phones      String[]
+    website_url String?
+    street      String?  @default("N/A")
+    country     String   @default("Honduras")
+    state       String   @default("Yoro")
+    city        String   @default("Olanchito")
+
+    company_id String?
+    Company    Company? @relation(fields: [company_id], references: [id])
+
+    purchases Sale[]
+}
+
+enum EmployeeContractType {
+    FULL_TIME
+    PART_TIME
+    TEMPORARY
+    INTERNSHIP
+    VOLUNTEER
+    OTHER
+}
+
+model Employee {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    first_name    String
+    middle_name   String?
+    last_name     String
+    id_card       String               @unique
+    birthdate     DateTime             @db.Date()
+    enabled       Boolean              @default(true)
+    contract_type EmployeeContractType @default(FULL_TIME)
+    emails        String[]
+    phones        String[]
+    website_url   String?
+    street        String?              @default("N/A")
+    country       String               @default("Honduras")
+    state         String               @default("Yoro")
+    city          String               @default("Olanchito")
+
+    job_id     String
+    Job        Job     @relation(fields: [job_id], references: [id])
+    company_id String
+    Company    Company @relation(fields: [company_id], references: [id])
+
+    users    User[]
+    payrolls PayrollItem[]
+}
+
+// https://www.sqltutorial.org/sql-inner-join/   https://www.google.com/search?q=job+sql+table&source=lnms&tbm=isch&sa=X&ved=2ahUKEwi81dam_I7_AhWFUjABHeSKB4IQ_AUoAXoECAEQAw&biw=1536&bih=792&dpr=1.25#imgrc=yS4vIsBk0hj1cM&imgdii=rTCbvkCFSbA-uM
+model Job {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name        String @unique
+    description String
+
+    employees Employee[]
+}
+
+model PayrollItem {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    deductions Int
+    overtime   Boolean @default(false)
+    salary     Int
+
+    payroll_id  String
+    Payroll     Payroll  @relation(fields: [payroll_id], references: [id])
+    employee_id String
+    Employee    Employee @relation(fields: [employee_id], references: [id])
+}
+
+enum PayrollType {
+    SALARY
+    BONUS
+    COMMISSION
+    OVERTIME
+    ALLOWANCE
+    OTHER
+}
+
+// https://www.sourcecodester.com/node/15235
+model Payroll {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    amount      Int
+    description String?
+    start_date  DateTime
+    end_date    DateTime
+    type        String
+
+    PayrollItem PayrollItem[]
+}
+
+model User {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    email    String  @unique
+    username String  @unique
+    password String
+    enabled  Boolean @default(true)
+    verified Boolean @default(false)
+
+    employee_id  String?
+    Employee     Employee? @relation(fields: [employee_id], references: [id])
+    user_role_id String?
+    UserRole     UserRole? @relation(fields: [user_role_id], references: [id])
+
+    sessions_created   Session[]
+    logs               Log[]
+    security_questions SecurityQuestion[]
+}
+
+model SecurityQuestion {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    enabled  Boolean @default(true)
+    question String
+
+    user_id String?
+    User    User?   @relation(fields: [user_id], references: [id])
+
+    answers SecurityQuestionAnswer[]
+}
+
+model SecurityQuestionAnswer {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    answer String
+
+    question_id String
+    Question    SecurityQuestion @relation(fields: [question_id], references: [id])
+}
+
+enum SessionRevokedReason {
+    REVOKED // By system or admin
+    LOGOUT
+    EXPIRED
+}
+
+model Session {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    token          String                @unique
+    expires_in     DateTime
+    revoked        Boolean               @default(false)
+    revoked_reason SessionRevokedReason? @default(REVOKED)
+
+    user_id String
+    user    User   @relation(fields: [user_id], references: [id])
+}
+
+model UserRole {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    enabled    Boolean  @default(true)
+
+    name        String  @unique
+    description String?
+
+    users_permission            Boolean @default(false)
+    dashboard_permission        Boolean @default(false)
+    jobs_permission             Boolean @default(false)
+    payrolls_permission         Boolean @default(false)
+    user_roles_permission       Boolean @default(false)
+    employees_permission        Boolean @default(false)
+    customers_permission        Boolean @default(false)
+    companies_permission        Boolean @default(false)
+    inventories_permission      Boolean @default(false)
+    menus_permission            Boolean @default(false)
+    items_permission            Boolean @default(false)
+    items_variations_permission Boolean @default(false)
+    items_modifiers_permission  Boolean @default(false)
+    pos_permission              Boolean @default(false)
+    cash_register_permission    Boolean @default(false)
+    terminals_permission        Boolean @default(false)
+    categories_permission       Boolean @default(false)
+    providers_permission        Boolean @default(false)
+    taxes_permission            Boolean @default(false)
+    discounts_permission        Boolean @default(false)
+    transactions_permission     Boolean @default(false)
+    invoices_permission         Boolean @default(false)
+    payments_permission         Boolean @default(false)
+    sales_permission            Boolean @default(false)
+    sale_items_permission       Boolean @default(false)
+    purchases_permission        Boolean @default(false)
+    purchase_items_permission   Boolean @default(false)
+    logs_permission             Boolean @default(false)
+
+    users       User[]
+    permissions UserRolePermission[]
+}
+
+model UserRolePermission {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name        String // User, User Role, Employee, Customer
+    description String? // Create new users, Read users, Update users, Delete users
+    key         String  @unique // user.create, user.read, user.update, user.delete
+    key_group   String  @unique // user, user_role, employee, customer
+
+    user_role_id String?
+    UserRole     UserRole? @relation(fields: [user_role_id], references: [id])
+}
+
+model Company {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    enabled    Boolean  @default(true)
+    created_by String?  @default("SYSTEM")
+
+    name         String
+    bussiness_id String  @unique // RTN
+    logo_url     String?
+
+    emails      String[]
+    phones      String[]
+    website_url String?
+    street      String?  @default("N/A")
+    country     String   @default("Honduras")
+    state       String   @default("Yoro")
+    city        String   @default("Olanchito")
+
+    employees   Employee[]
+    inventories Inventory[]
+    terminals   Terminal[]
+    Customer    Customer[]
+}
+
+model Shift {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    start_date DateTime
+    end_date   DateTime
+
+    terminal_id String?
+    Terminal    Terminal? @relation(fields: [terminal_id], references: [id])
+}
+
+model Terminal {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name        String
+    description String?
+
+    company_id String?
+    Company    Company? @relation(fields: [company_id], references: [id])
+
+    shifts         Shift[]
+    cash_registers CashRegister[]
+}
+
+model CashRegister {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    created_by     String?   @default("SYSTEM")
+    opening_amount Float
+    total_sales    Float     @default(0.00)
+    closing_amount Float?
+    closing_date   DateTime?
+    note           String?
+
+    terminal_id String?
+    Terminal    Terminal? @relation(fields: [terminal_id], references: [id])
+}
+
+model Provider {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    enabled    Boolean  @default(true)
+    created_by String?  @default("SYSTEM")
+
+    name         String   @unique
+    bussiness_id String   @unique // RTN
+    emails       String[]
+    phones       String[]
+    website_url  String?
+    street       String?  @default("N/A")
+    country      String   @default("Honduras")
+    state        String   @default("Yoro")
+    city         String   @default("Olanchito")
+
+    items     Item[]
+    purchases Purchase[]
+}
+
+model Inventory {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name        String
+    description String?
+
+    company_id String
+    Company    Company @relation(fields: [company_id], references: [id])
+
+    items Item[]
+}
+
+model Menu {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    name        String  @unique
+    description String?
+    image_url   String?
+
+    items Item[]
+}
+
+// Item could be a product, utensil, etc.
+model Item {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    enabled    Boolean  @default(true)
+    created_by String?  @default("SYSTEM")
+
+    name        String
+    description String?
+    quantity    Int?
+    price       Float
+    images      String[]
+
+    tax_id       String?
+    Tax          Tax?      @relation(fields: [tax_id], references: [id])
+    category_id  String?
+    Category     Category? @relation(fields: [category_id], references: [id])
+    inventory_id String
+    Inventory    Inventory @relation(fields: [inventory_id], references: [id])
+    provider_id  String?
+    Provider     Provider? @relation(fields: [provider_id], references: [id])
+
+    menus        Menu[]
+    variations   ItemVariant[]
+    modifiers    ItemModifier[]
+    SaleItem     SaleItem[]
+    PurchaseItem PurchaseItem[]
+}
+
+model Category {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    name        String  @unique
+    description String?
+
+    items Item[]
+}
+
+model ItemVariant {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    name    String   @unique //* T-Shirt Sizes
+    options String[] //* Small, Medium, Large
+
+    items           Item[]
+    sale_item       SaleItem[]
+    variant_options ItemVariantOption[]
+}
+
+model ItemVariantOption {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name  String
+    price Float  @default(0.00)
+
+    item_variant_id String
+    ItemVariant     ItemVariant @relation(fields: [item_variant_id], references: [id], onDelete: Cascade)
+}
+
+model ItemModifier {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    name String @unique
+
+    options    ItemModifierOption[]
+    items      Item[]
+    sale_items SaleItem[]
+}
+
+model ItemModifierOption {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name  String
+    price Float  @default(0.00)
+
+    item_modifier_id String
+    ItemModifier     ItemModifier @relation(fields: [item_modifier_id], references: [id], onDelete: Cascade)
+}
+
+model Tax {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    name        String  @unique
+    description String?
+    rate        Float
+
+    sales     Sale[]
+    purchases Purchase[]
+    items     Item[]
+}
+
+enum DiscountType {
+    PERCENTAGE
+    FIXED
+}
+
+model Discount {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    name        String       @unique
+    note        String?
+    amount_type DiscountType @default(PERCENTAGE)
+    amount      Float
+
+    sales      Sale[]
+    sale_items SaleItem[]
+}
+
+enum TransactionType {
+    INCOME
+    EXPENSE
+}
+
+enum TransactionStatus {
+    PENDING
+    COMPLETED
+    FAILED
+    CANCELLED
+}
+
+// Incomes and Expenses
+model Transaction {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    type        TransactionType
+    sub_type    String? // Salary, Purchase, Sale, etc.
+    description String?
+    amount      Float
+
+    payments Payment[]
+}
+
+enum PaymentType {
+    CASH
+    CARD
+    TRANSFER
+    OTHER
+}
+
+model Payment {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    type   PaymentType
+    amount Float
+    note   String?
+
+    transaction_id String?
+    Transaction    Transaction? @relation(fields: [transaction_id], references: [id])
+}
+
+model InvoiceLote {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    enabled    Boolean  @default(true)
+
+    cai         String   @unique
+    start_date  DateTime
+    end_date    DateTime
+    start_range String
+    end_range   String
+    current     String?
+    used        Boolean  @default(false) // No lo necesitamos, solo tendremos un único lote de facturas y se actualizará el current
+
+    invoices Invoice[]
+}
+
+model Invoice {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    cai_number String? @unique
+    file_url   String?
+
+    sale_id         String
+    Sale            Sale         @relation(fields: [sale_id], references: [id])
+    invoice_lote_id String?
+    InvoiceLote     InvoiceLote? @relation(fields: [invoice_lote_id], references: [id])
+}
+
+enum OrderStatus {
+    PENDING
+    PAID
+    CANCELLED
+}
+
+model Sale {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    code           String       @unique
+    status         OrderStatus  @default(PENDING)
+    payment_method PaymentType? @default(CASH)
+    subtotal       Float
+    total          Float
+    note           String?
+
+    tax_id      String?
+    Tax         Tax?      @relation(fields: [tax_id], references: [id])
+    discount_id String?
+    Discount    Discount? @relation(fields: [discount_id], references: [id])
+    customer_id String?
+    Customer    Customer? @relation(fields: [customer_id], references: [id])
+
+    sale_items SaleItem[]
+    invoices   Invoice[]
+}
+
+model SaleItem {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    price    String
+    note     String?
+    quantity Int?
+
+    sale_id          String?
+    Sale             Sale?         @relation(fields: [sale_id], references: [id])
+    item_id          String
+    Item             Item          @relation(fields: [item_id], references: [id])
+    item_variant_id  String?
+    ItemVariant      ItemVariant?  @relation(fields: [item_variant_id], references: [id])
+    item_modifier_id String?
+    ItemModifier     ItemModifier? @relation(fields: [item_modifier_id], references: [id])
+    discount_id      String?
+    Discount         Discount?     @relation(fields: [discount_id], references: [id])
+}
+
+model Purchase {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    created_by String?  @default("SYSTEM")
+
+    code           String       @unique
+    status         OrderStatus  @default(PENDING)
+    payment_method PaymentType? @default(CASH)
+    subtotal       Float
+    total          Float
+    note           String?
+    expected_date  DateTime     @db.Date()
+
+    tax_id      String?
+    Tax         Tax?     @relation(fields: [tax_id], references: [id])
+    provider_id String
+    Provider    Provider @relation(fields: [provider_id], references: [id])
+
+    purchase_items PurchaseItem[]
+}
+
+model PurchaseItem {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    price    String
+    quantity Int
+    total    Float
+    note     String?
+
+    purchase_id String   @unique
+    Purchase    Purchase @relation(fields: [purchase_id], references: [id])
+    item_id     String
+    Item        Item     @relation(fields: [item_id], references: [id])
+}
+
+enum SystemClient {
+    HTTP_CLIENT
+    DELI_JUNIOR
+    ALESSANDROS_FOOD
+}
+
+// https://raw.githubusercontent.com/RicardoEscobar/youtube-code/c981c6644688514825e491374930a1c7e8047662/MySQL/triggers_bitacora.sql
+model Log {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    client   SystemClient
+    type     String // INSERT, UPDATE, DELETE
+    message  String // Message to be logged
+    table    String // Table was updated
+    query    String // Query that triggered the log
+    row_id   String // Save row id before update
+    row_data Json // Save row data before update
+    hostname String // alessandro.vercel.app
+    ip       String // 39.245.22.96
+
+    user_id String
+    user    User   @relation(fields: [user_id], references: [id])
+}
+
+model Tenant {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name        String  @unique
+    description String?
+    enabled     Boolean @default(true)
+
+    // companies Company[]
+}
+
+model SystemSetting {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+    enabled    Boolean  @default(true)
+
+    code        String @unique
+    name        String // Company Name
+    description String // Description of the setting
+    value       String // Alessandro's Food
+}
+
+model Analytic {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name  String // Total Sales
+    value String // 1000
+    type  String // Number, Percentage, Currency, etc.
+}
+
+enum UnitType {
+    LENGTH
+    AREA
+    VOLUME
+    WEIGHT
+    TIME
+    DIGITAL
+    OTHER
+}
+
+model Unit {
+    id         String   @id @default(uuid())
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    name        String
+    type        UnitType
+    description String?
+    symbol      String?
+}
